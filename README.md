@@ -1,6 +1,12 @@
-# PhoenixCodeReloadProgress
+# Setup
 
-**TODO: Add description**
+Open `endpoint.ex`, change:
+
+  `plug Phoenix.CodeReloader`
+
+to
+
+  `plug PhoenixCodeReloadProgress.CodeReloader`
 
 ## Installation
 
