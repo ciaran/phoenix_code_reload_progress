@@ -68,38 +68,42 @@ defmodule PhoenixCodeReloadProgress.CodeReloader do
     # endpoint = PhoenixCodeReloadProgress.Supervisor
     IO.inspect format: conn
 
-    fun =
-      fn
-        {:done, conn} ->
-          if conn.state == :chunked do
-            Plug.Conn.chunk(conn, "Done!<br />\n")
-            Plug.Conn.chunk(conn, ~s(<meta http-equiv="refresh" content="0">\n))
-            halt(conn)
-          else
-            conn
-          end
-        {:output, conn, chars} ->
-          conn =
-            if conn.state != :chunked do
-              {:ok, conn} =
-                conn
-                |> put_resp_content_type("text/html")
-                |> send_chunked(200)
-                |> Plug.Conn.chunk(compile_template())
-              conn
-            else
-              conn
-            end
-
-          # IO.puts "CHARS: #{conn.state} - #{chars}"
-
-          Plug.Conn.chunk(conn, PhoenixCodeReloadProgress.Colors.to_html(chars))
-          conn
-      end
-    res = opts[:reloader].(conn, fun)
+    res = opts[:reloader].(conn, &compile_callback/1)
     IO.inspect run_compile_res: res
     # Plug.Conn.chunk(conn, "Done!<br />\n")
     res
+  end
+
+  def compile_callback({:done, conn}) do
+    if conn.state == :chunked do
+      Plug.Conn.chunk(conn, "Done!<br />\n")
+      Plug.Conn.chunk(conn, ~s(<meta http-equiv="refresh" content="0">\n))
+      halt(conn)
+    else
+      conn
+    end
+  end
+
+  def compile_callback({:output, conn, chars}) do
+    conn = start_progress_output(conn)
+
+    # IO.puts "CHARS: #{conn.state} - #{chars}"
+
+    {:ok, conn} = Plug.Conn.chunk(conn, PhoenixCodeReloadProgress.Colors.to_html(chars))
+    conn
+  end
+
+  defp start_progress_output(conn) do
+    if conn.state != :chunked do
+      {:ok, conn} =
+        conn
+        |> put_resp_content_type("text/html")
+        |> send_chunked(200)
+        |> Plug.Conn.chunk(compile_template())
+      conn
+    else
+      conn
+    end
   end
 
   defp header_template(title) do
