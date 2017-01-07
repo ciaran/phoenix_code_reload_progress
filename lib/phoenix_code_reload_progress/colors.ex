@@ -11,7 +11,3 @@ defmodule PhoenixCodeReloadProgress.Colors do
     end)
   end
 end
-
-"\e[33mwarning: \e[0mthe Phoenix.Param protocol has already been consolidated, an implementation for HexWeb.Package has no effect\n  web/models/package.ex:8\n\n"
-|> PhoenixCodeReloadProgress.Colors.to_html
-|> IO.puts

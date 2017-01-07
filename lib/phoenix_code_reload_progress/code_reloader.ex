@@ -41,11 +41,6 @@ defmodule PhoenixCodeReloadProgress.CodeReloader do
   API used by Plug to invoke the code reloader on every request.
   """
   def call(conn, opts) do
-    # conn =
-    #   conn
-    #   |> put_resp_content_type("text/html")
-    #   |> send_chunked(200)
-
     IO.puts "Calling reload! from #{inspect self()}"
     case run_compile(conn, opts) do
       {:ok, conn} ->
