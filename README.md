@@ -1,12 +1,11 @@
 # Setup
 
-Open `endpoint.ex`, change:
-
-  `plug Phoenix.CodeReloader`
-
-to
+Open `endpoint.ex`, comment out the contents of the `if code_reloading? do` block, and insert:
 
   `plug PhoenixCodeReloadProgress.CodeReloader`
+
+Note that you currently need to comment out the two live_reloader lines as well,
+as Phoenix websockets have a hardcoded call to the builtin code reloader.
 
 ## Installation
 
