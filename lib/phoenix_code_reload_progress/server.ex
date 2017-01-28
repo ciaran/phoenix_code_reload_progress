@@ -8,21 +8,24 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.ConnRegistry do
     {:ok, %{}}
   end
 
-  # Client
+  ## Client
 
+  # Adds the conn to the list stored for the given endpoint
   def insert(endpoint, conn) do
     GenServer.call(__MODULE__, {:insert, endpoint, conn})
   end
 
+  # Removes and returns the conn with the given owner belonging to the endpoint
   def remove(endpoint, owner) do
     GenServer.call(__MODULE__, {:remove, endpoint, owner})
   end
 
+  # Updates all conns stored in the given endpoint by calling `fun` on each
   def update_all(endpoint, fun) do
     GenServer.call(__MODULE__, {:update_all, endpoint, fun})
   end
 
-  # Server
+  ## Server
 
   def handle_call({:insert, endpoint, conn}, _from, table) do
     table = Map.update(table, endpoint, %{conn.owner => conn}, &(Map.put(&1, conn.owner, conn)))
