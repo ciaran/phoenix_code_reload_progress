@@ -28,6 +28,8 @@ defmodule PhoenixCodeReloadProgress.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    []
+    [
+      {:plug, "~> 1.3", only: :dev},
+    ]
   end
 end
