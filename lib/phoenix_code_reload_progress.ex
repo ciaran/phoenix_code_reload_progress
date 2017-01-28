@@ -6,15 +6,10 @@ defmodule PhoenixCodeReloadProgress do
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
 
-    endpoint = Emoticast.Endpoint
-
-    args = [nil, endpoint, [:gettext, :phoenix, :elixir],
-            [name: Module.concat(endpoint, CodeReloadProgress)]]
-
     # Define workers and child supervisors to be supervised
     children = [
       # Starts a worker by calling: PhoenixCodeReloadProgress.Worker.start_link(arg1, arg2, arg3)
-      worker(PhoenixCodeReloadProgress.CodeReloader.Server, args),
+      worker(PhoenixCodeReloadProgress.CodeReloader.Server, []),
     ]
 
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
