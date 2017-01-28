@@ -1,22 +1,46 @@
-defmodule ConnRegistry do
-  def init do
-    :ets.new(:conn_registry, [:named_table, :public])
+defmodule PhoenixCodeReloadProgress.CodeReloader.ConnRegistry do
+  def start_link do
+    GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
-  def insert(_endpoint, conn) do
-    :ets.insert(:conn_registry, {:conn, conn})
+  def init(nil) do
+    table = :ets.new(__MODULE__, [])
+    {:ok, table}
   end
 
-  def update_all(_endpoint, fun) do
-    [{:conn, conn}] = :ets.lookup(:conn_registry, :conn)
+  # Client
+
+  def insert(endpoint, conn) do
+    IO.puts "Calling insert #{endpoint} #{inspect conn.owner}"
+    GenServer.call(__MODULE__, {:insert, endpoint, conn})
+  end
+
+  def remove(endpoint, owner) do
+    GenServer.call(__MODULE__, {:remove, endpoint, owner})
+  end
+
+  def update_all(endpoint, fun) do
+    GenServer.call(__MODULE__, {:update_all, endpoint, fun})
+  end
+
+  # Server
+
+  def handle_call({:insert, _endpoint, conn}, _from, table) do
+    :ets.insert(table, {:conn, conn})
+    {:reply, :ok, table}
+  end
+
+  def handle_call({:update_all, _endpoint, fun}, _from, table) do
+    [{:conn, conn}] = :ets.lookup(table, :conn)
     conn = fun.(conn)
-    :ets.insert(:conn_registry, {:conn, conn})
+    :ets.insert(table, {:conn, conn})
+    {:reply, :ok, table}
   end
 
-  def remove(_endpoint, _owner) do
-    [{:conn, conn}] = :ets.lookup(:conn_registry, :conn)
-    :ets.delete(:conn_registry, :conn)
-    conn
+  def handle_call({:remove, _endpoint, _owner}, _from, table) do
+    [{:conn, conn}] = :ets.lookup(table, :conn)
+    :ets.delete(table, :conn)
+    {:reply, {:ok, conn}, table}
   end
 end
 
@@ -25,10 +49,9 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.Server do
   use GenServer
 
   require Logger
-  alias PhoenixCodeReloadProgress.CodeReloader.Proxy
+  alias PhoenixCodeReloadProgress.CodeReloader.{Proxy, ConnRegistry}
 
   def start_link() do
-    ConnRegistry.init
     GenServer.start_link(__MODULE__, false, name: __MODULE__)
   end
 
@@ -43,7 +66,7 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.Server do
 
     res = GenServer.call(__MODULE__, {:reload!, {endpoint, callback}}, :infinity)
 
-    conn = ConnRegistry.remove(endpoint, conn.owner)
+    {:ok, conn} = ConnRegistry.remove(endpoint, conn.owner)
 
     {res, conn}
   end
