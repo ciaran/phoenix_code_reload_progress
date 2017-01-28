@@ -1,17 +1,16 @@
+# Stores a map of %endpoint: %{conn.owner: conn, …}}
 defmodule PhoenixCodeReloadProgress.CodeReloader.ConnRegistry do
   def start_link do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
   def init(nil) do
-    table = :ets.new(__MODULE__, [])
-    {:ok, table}
+    {:ok, %{}}
   end
 
   # Client
 
   def insert(endpoint, conn) do
-    IO.puts "Calling insert #{endpoint} #{inspect conn.owner}"
     GenServer.call(__MODULE__, {:insert, endpoint, conn})
   end
 
@@ -25,21 +24,35 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.ConnRegistry do
 
   # Server
 
-  def handle_call({:insert, _endpoint, conn}, _from, table) do
-    :ets.insert(table, {:conn, conn})
+  def handle_call({:insert, endpoint, conn}, _from, table) do
+    table = Map.update(table, endpoint, %{conn.owner => conn}, &(Map.put(&1, conn.owner, conn)))
     {:reply, :ok, table}
   end
 
-  def handle_call({:update_all, _endpoint, fun}, _from, table) do
-    [{:conn, conn}] = :ets.lookup(table, :conn)
-    conn = fun.(conn)
-    :ets.insert(table, {:conn, conn})
+  def handle_call({:update_all, endpoint, fun}, _from, table) do
+    conns = Map.get(table, endpoint)
+
+    conns =
+      conns
+      |> Enum.map(fn {owner, conn} ->
+        conn = fun.(conn)
+        {owner, conn}
+      end)
+      |> Enum.into(%{})
+
+    table = Map.put(table, endpoint, conns)
+
     {:reply, :ok, table}
   end
 
-  def handle_call({:remove, _endpoint, _owner}, _from, table) do
-    [{:conn, conn}] = :ets.lookup(table, :conn)
-    :ets.delete(table, :conn)
+  def handle_call({:remove, endpoint, owner}, _from, table) do
+    conns = Map.get(table, endpoint)
+
+    conn = Map.get(conns, owner)
+    conns = Map.delete(conns, owner)
+
+    table = Map.put(table, endpoint, conns)
+
     {:reply, {:ok, conn}, table}
   end
 end
@@ -237,7 +250,6 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.Server do
         nil ->
           nil
         pid ->
-          # IO.puts "Registering #{inspect pid} as stderr"
           Process.unregister(:standard_error)
           Process.register(proxy_gl, :standard_error)
           pid
@@ -247,7 +259,6 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.Server do
       {fun.(), Proxy.stop(proxy_gl)}
     after
       if stderr do
-        # IO.puts "Unregistering #{inspect stderr} as stderr"
         if Process.whereis(:standard_error) do
           Process.unregister(:standard_error)
         end

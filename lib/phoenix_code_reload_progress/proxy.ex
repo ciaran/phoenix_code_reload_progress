@@ -47,7 +47,7 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.Proxy do
     # Logger.info "put_chars(#{inspect chars})"
     callback.(chars)
     send(Process.group_leader, {:io_request, from, reply, {:put_chars, chars}})
-    send(stderr, {:io_request, from, reply, {:put_chars, chars}})
+    # send(stderr, {:io_request, from, reply, {:put_chars, chars}})
     {:noreply, {output <> IO.chardata_to_string(chars), callback, stderr}}
   end
 end

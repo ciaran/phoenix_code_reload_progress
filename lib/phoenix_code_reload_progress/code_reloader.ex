@@ -41,32 +41,15 @@ defmodule PhoenixCodeReloadProgress.CodeReloader do
   API used by Plug to invoke the code reloader on every request.
   """
   def call(conn, opts) do
-    IO.puts "Calling reload! from #{inspect self()}"
-    case run_compile(conn, opts) do
+    case opts[:reloader].(conn, &compile_callback/1) do
       {:ok, conn} ->
-        IO.inspect forwarding_conn: {conn.halted, conn.state}
-        # Plug.Conn.chunk(conn, ~s(Done!\n))
-
         conn
-        # |> put_resp_content_type("text/html")
-        # |> send_resp(200, "Done")
-        # |> halt()
       {:error, output, conn} ->
         conn
         |> put_resp_content_type("text/html")
         |> send_resp(500, template(conn, output))
         |> halt()
     end
-  end
-
-  def run_compile(conn, opts) do
-    # endpoint = PhoenixCodeReloadProgress.Supervisor
-    IO.inspect format: conn
-
-    res = opts[:reloader].(conn, &compile_callback/1)
-    IO.inspect run_compile_res: res
-    # Plug.Conn.chunk(conn, "Done!<br />\n")
-    res
   end
 
   def compile_callback({:done, conn}) do
@@ -81,9 +64,6 @@ defmodule PhoenixCodeReloadProgress.CodeReloader do
 
   def compile_callback({:output, conn, chars}) do
     conn = start_progress_output(conn)
-
-    # IO.puts "CHARS: #{conn.state} - #{chars}"
-
     {:ok, conn} = Plug.Conn.chunk(conn, PhoenixCodeReloadProgress.Colors.to_html(chars))
     conn
   end
