@@ -1,3 +1,25 @@
+defmodule ConnRegistry do
+  def init do
+    :ets.new(:conn_registry, [:named_table, :public])
+  end
+
+  def insert(_endpoint, conn) do
+    :ets.insert(:conn_registry, {:conn, conn})
+  end
+
+  def update_all(_endpoint, fun) do
+    [{:conn, conn}] = :ets.lookup(:conn_registry, :conn)
+    conn = fun.(conn)
+    :ets.insert(:conn_registry, {:conn, conn})
+  end
+
+  def remove(_endpoint, _owner) do
+    [{:conn, conn}] = :ets.lookup(:conn_registry, :conn)
+    :ets.delete(:conn_registry, :conn)
+    conn
+  end
+end
+
 defmodule PhoenixCodeReloadProgress.CodeReloader.Server do
   @moduledoc false
   use GenServer
@@ -6,7 +28,7 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.Server do
   alias PhoenixCodeReloadProgress.CodeReloader.Proxy
 
   def start_link() do
-    :ets.new(:conn_registry, [:named_table, :public])
+    ConnRegistry.init
     GenServer.start_link(__MODULE__, false, name: __MODULE__)
   end
 
@@ -15,17 +37,13 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.Server do
   end
 
   def reload!(conn, callback) do
-    :ets.insert(:conn_registry, {:conn, conn})
-
-    IO.inspect conn
     endpoint = conn.private.phoenix_endpoint
-    IO.inspect endpoint
+
+    ConnRegistry.insert(endpoint, conn)
 
     res = GenServer.call(__MODULE__, {:reload!, {endpoint, callback}}, :infinity)
-    IO.inspect res: res
 
-    [{:conn, conn}] = :ets.lookup(:conn_registry, :conn)
-    :ets.delete(:conn_registry, :conn)
+    conn = ConnRegistry.remove(endpoint, conn.owner)
 
     {res, conn}
   end
@@ -72,16 +90,14 @@ defmodule PhoenixCodeReloadProgress.CodeReloader.Server do
             :error
         end
       end, fn chars ->
-        [{:conn, conn}] = :ets.lookup(:conn_registry, :conn)
-        conn = callback.({:output, conn, chars})
-        :ets.insert(:conn_registry, {:conn, conn})
+        ConnRegistry.update_all(endpoint, fn conn ->
+          callback.({:output, conn, chars})
+        end)
       end)
 
-    [{:conn, conn}] = :ets.lookup(:conn_registry, :conn)
-    # callback.({:output, conn, chars})
-
-    conn = callback.({:done, conn})
-    :ets.insert(:conn_registry, {:conn, conn})
+    ConnRegistry.update_all(endpoint, fn conn ->
+      callback.({:done, conn})
+    end)
 
     reply =
       case res do
